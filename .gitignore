@@ -1,0 +1,10 @@
+# Models are stored on HF Hub, not in git
+models/
+*.gguf
+*.bin
+*.pt
+__pycache__/
+.hf-venv/
+logs/
+.env
+*.egg-info
