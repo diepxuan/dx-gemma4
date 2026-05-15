@@ -179,6 +179,88 @@ def main():
             task_type="simba_schema", needs_search=False
         ))
 
+    # 5. Agent Failure Patterns (learned from session history)
+    # These teach the agent to handle common mistakes and avoid repeating them
+    agent_failure_patterns = [
+        # Web provider config mistakes
+        ("em config web search dùng nine-router",
+         "Đã cấu hình nine-router cho web.search_backend. Lưu ý: nine-router chỉ hỗ trợ search, không dùng được cho extract. Giữ web.extract_backend là tavily.",
+         "web_config"),
+        ("dùng nine-router làm web extract được không",
+         "Không được. nine-router chỉ hỗ trợ search endpoint. Để extract URL content, dùng tavily hoặc firecrawl làm extract_backend.",
+         "web_config"),
+        ("em cấu hình sai web backend rồi, sửa lại",
+         "Đã nhận lỗi. Đang revert config web backend về tavily cho cả search và extract. Kiểm tra lại config.yaml sau khi sửa.",
+         "error_recovery"),
+        ("tại sao web extract bị lỗi với nine-router",
+         "nine-router là search-only backend, không có endpoint extract. Cấu hình đúng: search_backend=tabily, extract_backend=tavily.",
+         "web_config"),
+        ("em set extract_backend = nine-router",
+         "Sai. nine-router không hỗ trợ extract. Đã revert extract_backend về tavily. Chỉ dùng nine-router cho search.",
+         "error_recovery"),
+
+        # DNS / Network troubleshooting
+        ("GitHub API bị timeout, em fix đi",
+         "Đã kiểm tra DNS và API reachability. Nếu curl api.github.com timeout nhưng git push qua SSH ok, vấn đề là HTTPS/TLS route. Đã thử đổi DNS, retry sau 30s.",
+         "network_debug"),
+        ("em đổi DNS server sang 10.0.0.103",
+         "Đã cập nhật /etc/resolv.conf. Đã kiểm tra curl api.github.com hoạt động. GitHub API đã phản hồi 200.",
+         "network_debug"),
+        ("tại sao gh pr merge bị timeout",
+         "GraphQL API của GitHub bị TLS handshake timeout. Kiểm tra: curl -I api.github.com. Nếu API responsive thì retry. Nếu vẫn timeout, merge thủ công qua git + push.",
+         "network_debug"),
+
+        # Colab execution errors
+        ("trainer is not defined trong Colab",
+         "Lỗi chạy sai thứ tự cell. Cell 8 (Initialize SFTTrainer) phải chạy trước Cell 9 (trainer.train()). Hoặc dùng Run all để chạy tuần tự từ đầu.",
+         "colab_debug"),
+        ("lỗi NameError trong Colab khi train model",
+         "Biến chưa được khai báo do nhảy cóc cell hoặc kernel bị reset. Chạy lại các cell trước theo thứ tự, không skip cell nào.",
+         "colab_debug"),
+        ("Colab báo lỗi NameError: name 'model' is not defined",
+         "Cell load model chưa được chạy hoặc kernel bị restart. Chạy Cell 2 (Load Model) rồi mới chạy các cell sau.",
+         "colab_debug"),
+
+        # Git workflow mistakes
+        ("em commit nhầm vào main rồi",
+         "Đã dừng. Không push. Tạo branch mới từ main, cherry-pick commit đúng vào branch đó. Reset main về trạng thái gốc.",
+         "error_recovery"),
+        ("em force push lên main",
+         "Dừng lại. Không force push lên main. Tạo branch mới cho thay đổi. Chỉ push lên branch feature.",
+         "error_recovery"),
+        ("em amend commit trên PR cũ",
+         "Không sửa PR đã mở bằng amend. Tạo branch mới, commit thay đổi, mở PR mới. PR cũ giữ nguyên.",
+         "error_recovery"),
+        ("PR bị conflict, em resolve đi",
+         "Đã fetch main mới nhất. Rebase branch feature lên main. Resolve conflict từng file. Force push branch (chỉ branch feature, không phải main).",
+         "git_workflow"),
+
+        # Token / Secret handling
+        ("em hardcode HF token vào notebook",
+         "Dừng. Không hardcode token. Dùng Colab Secrets (userdata.get('HF_TOKEN')) hoặc biến môi trường. Đã xóa token khỏi notebook.",
+         "security"),
+        ("token HF bị lộ trong git history",
+         "Đã xóa token khỏi history. Tạo branch mới sạch từ origin. Không push branch chứa token. Dùng git filter-branch để xóa secret khỏi history cũ.",
+         "security"),
+
+        # Context hygiene
+        ("em làm xong task rồi, giờ làm gì tiếp",
+         "Đã rút gọn context. Đã kiểm tra và update skill nếu phát hiện workflow mới. Sẵn sàng cho task tiếp theo.",
+         "context_hygiene"),
+        ("context dài quá, em rút gọn đi",
+         "Đã tóm tắt context: giữ lại task chính, kết quả, và các file quan trọng. Xóa các log không cần thiết.",
+         "context_hygiene"),
+    ]
+    for q, ans, ttype in agent_failure_patterns:
+        m = {
+            "task_type": ttype, "domain": "workspace", "framework": "Hermes/Colab/Git",
+            "complexity": "medium", "intent": "execute_task",
+            "needs_search": False, "needs_tools": True, "recommended_model": "assistant-model",
+            "constraints": list(CONSTRAINTS), "enriched_prompt": clean(ans)
+        }
+        text = f"<|system|>\n{SYSTEM_PROMPT}\n<|user|>\n{clean(q)}\n<|assistant|>\n{json.dumps(m, ensure_ascii=False, separators=(',',':'))}<|end|>"
+        examples.append({"text": text})
+
     # Deduplicate & Shuffle
     seen = set()
     final = []
