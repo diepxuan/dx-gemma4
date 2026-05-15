@@ -8,3 +8,6 @@ __pycache__/
 logs/
 .env
 *.egg-info
+
+# Local imported docs/sessions - do not commit
+imports/
