@@ -86,7 +86,7 @@ def make_ex(q, ans, task_type="simba_schema", needs_search=False, enriched_promp
         "needs_search": needs_search,
         "needs_tools": not needs_search, # If from memory, usually no search; if logic, needs search
         "recommended_model": "assistant-model",
-        "constraints": CONSTRAINTS,
+        "constraints": list(CONSTRAINTS),
     }
     if needs_search:
         meta["intent"] = "find_and_explain_logic"
