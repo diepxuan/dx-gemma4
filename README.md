@@ -52,7 +52,12 @@ git push -u origin main
 
 Colab pull dataset:
 ```python
-!git clone git@github.com:diepxuan/dx-gemma4.git /content/dataset
+!git clone https://github.com/diepxuan/dx-gemma4.git /content/dataset-repo
+```
+
+Kaggle pull dataset:
+```python
+!git clone https://github.com/diepxuan/dx-gemma4.git /kaggle/working/dataset-repo
 ```
 
 ### 3. Cài dependencies
@@ -67,6 +72,32 @@ pip install huggingface_hub  # đã có trong .hf-venv
 ```
 
 ## Usage
+
+### Fine-tune trên Kaggle khi Colab hết quota
+
+Dùng notebook:
+
+```text
+notebooks/gemma4_e2b_router_finetune_kaggle.ipynb
+```
+
+Thiết lập trên Kaggle:
+
+```text
+1. Settings -> Accelerator -> GPU
+2. Settings -> Internet -> On
+3. Add-ons / Secrets -> tạo secret HF_TOKEN
+4. Run cells 1-12 theo thứ tự
+```
+
+Notebook Kaggle dùng `/kaggle/working`, `kaggle_secrets.UserSecretsClient`, clone dataset từ GitHub bằng HTTPS, rồi upload GGUF/LoRA/manifest lên Hugging Face Hub.
+
+Nếu thiếu VRAM, giảm Cell 7:
+
+```python
+per_device_train_batch_size=1
+gradient_accumulation_steps=8
+```
 
 ```bash
 # Generate dataset mới
@@ -92,7 +123,8 @@ python3 ~/gemma4-router-finetune/pipeline.py --step all
 ├── dataset/
 │   └── training_data.jsonl          # Generated dataset (push lên GitHub)
 ├── notebooks/
-│   └── gemma4_e2b_router_finetune.ipynb  # Colab notebook
+│   ├── gemma4_e2b_router_finetune.ipynb         # Colab notebook
+│   └── gemma4_e2b_router_finetune_kaggle.ipynb  # Kaggle notebook fallback
 ├── scripts/
 │   ├── generate_dataset.py          # Dataset generator
 │   └── create_notebook.py           # Notebook generator
